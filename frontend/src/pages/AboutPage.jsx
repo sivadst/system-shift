@@ -156,7 +156,7 @@ export default function AboutPage({ onNavigate }) {
           A critical flaw in modern "AI-driven" systems is attempting to automate human governance out of the loop. SYSTEM//SHIFT explicitly rejects normative AI recommendations. 
           When testing a scenario (e.g. adding 4 buses), the system does NOT declare <em>“You should add 4 buses.”</em> 
           Instead, it illuminates the trade-off: 
-          <strong> “This scenario reduces estimated student waiting time from 18.4 min to 7.4 min, but increases daily fleet operating costs by ₹6,400.”</strong>
+          <strong> “This scenario reduces estimated student waiting time from 18.4 min to 7.4 min, but increases daily fleet operating costs by ₹6,440.”</strong>
         </p>
 
         <p style={{ fontSize: '1rem', color: '#555', lineHeight: 1.5, marginBottom: '1.5rem' }}>

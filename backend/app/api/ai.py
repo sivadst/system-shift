@@ -19,7 +19,9 @@ async def ask_system_ai(req: AIQueryRequest, db: Session = Depends(get_db)):
         grounded_data=result["grounded_data"],
         affected_nodes=result["affected_nodes"],
         trade_offs_noted=result.get("trade_offs_noted"),
-        confidence_score=result.get("confidence_score", 0.98),
+        confidence_score=result.get("confidence_score"),
+        grounding_status=result.get("grounding_status"),
+        evidence_trail=result.get("evidence_trail"),
         model_used=result.get("model_used", "grounded-engine"),
         suggested_followups=result.get("suggested_followups", [])
     )
@@ -68,8 +70,8 @@ def get_operational_insights(db: Session = Depends(get_db)):
             "title": "TRADE-OFF BOUNDARY: Fleet Expansion vs Operating Budget",
             "system": "SIMULATION",
             "severity": "INFO",
-            "summary": "Adding 4 peak buses reduces wait times by ~47% (18.4m -> 9.7m) but inflates daily fleet logistics expense from ₹18,400 to ~₹24,800 (+35%). The decision remains with the campus director.",
-            "metrics": {"wait_delta": "-8.7 min", "cost_delta": "+₹6,400/day", "decision_type": "Human in the loop"},
+            "summary": "Adding 4 peak buses reduces wait times by ~60% (18.4m -> 7.4m) but inflates daily fleet logistics expense from ₹18,400 to ₹24,840 (+35%). The decision remains with the human operator.",
+            "metrics": {"wait_delta": "-11.0 min", "cost_delta": "+₹6,440/day", "decision_type": "Human in the loop"},
             "cascade_target": "MANAGEMENT",
             "recommended_action": "Review budget allocation in What-If Simulator."
         }

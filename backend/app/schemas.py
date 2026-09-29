@@ -133,13 +133,29 @@ class AIQueryRequest(BaseModel):
     current_route: Optional[str] = None
     scenario_id: Optional[int] = None
 
+class GroundingStatus(BaseModel):
+    status: str
+    sources_retrieved_count: int
+    metrics_referenced_count: int
+    unsupported_claims_count: int
+    verification_badges: List[str]
+
+class EvidenceItem(BaseModel):
+    claim: str
+    source: str
+    record_id: str
+    metric_value: str
+    field: Optional[str] = None
+
 class AIQueryResponse(BaseModel):
     question: str
     explanation: str
     grounded_data: Dict[str, Any]
     affected_nodes: List[str]
     trade_offs_noted: Optional[str] = None
-    confidence_score: float
+    confidence_score: Optional[float] = None
+    grounding_status: Optional[GroundingStatus] = None
+    evidence_trail: Optional[List[EvidenceItem]] = None
     model_used: str
     suggested_followups: List[str]
 

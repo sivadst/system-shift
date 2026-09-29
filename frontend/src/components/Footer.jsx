@@ -59,9 +59,9 @@ export default function Footer({ onNavigate }) {
             OPERATIONAL VERIFICATION
           </div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <div>Database: <strong>100,000+ Real Event Logs</strong></div>
-            <div>Simulation: <strong>Deterministic Queuing & Fleet Models</strong></div>
-            <div>AI Grounding: <strong>Strict Telemetry Context (No Hallucinations)</strong></div>
+            <div>Database: <strong>100,000+ Synthetic Event Records (Live Feed Ready)</strong></div>
+            <div>Simulation: <strong>Calibrated Queuing & Fleet Models</strong></div>
+            <div>AI Grounding: <strong>Telemetry-Grounded Reasoning Protocol</strong></div>
             <div>Decision Principle: <strong>Non-Normative Trade-Offs (Human in the loop)</strong></div>
           </div>
           <div style={{ marginTop: '1rem' }}>

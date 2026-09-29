@@ -42,7 +42,7 @@ export default function Header({ currentRoute, onNavigate, liveTime }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
           <span>TICK: <strong style={{ color: 'var(--accent-green)' }}>{liveTime || '08:30:14 UTC'}</strong></span>
-          <span style={{ color: 'var(--accent-yellow)' }}>100K+ RECORDS ONLINE</span>
+          <span>DATA: <strong style={{ color: 'var(--accent-yellow)' }}>100K+ SYNTHETIC TELEMETRY</strong> <span style={{ color: '#AAA', fontSize: '0.72rem' }}>(LIVE IOT/AVL READY)</span></span>
         </div>
       </div>
 

@@ -35,15 +35,16 @@ export default function DataPage() {
       
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
           <span className="brutal-badge badge-yellow">DATA CREDIBILITY & SCALE</span>
-          <span className="brutal-badge badge-green">100,000+ SYNTHETIC RECORDS VERIFIED</span>
+          <span className="brutal-badge badge-green">100,000+ SYNTHETIC TELEMETRY RECORDS</span>
+          <span className="brutal-badge badge-blue">MODULAR LIVE IOT/AVL ADAPTER READY</span>
         </div>
         <h1 style={{ fontSize: 'clamp(2.3rem, 5vw, 3.5rem)', fontWeight: 900 }}>
           DATA EXPLORER & AUDIT CONSOLE
         </h1>
-        <p style={{ fontSize: '1.15rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-          Inspect the underlying operational database. Proves that SYSTEM//SHIFT runs on actual structured telemetry rather than hardcoded client-side demonstrations.
+        <p style={{ fontSize: '1.15rem', color: 'var(--text-muted)', fontWeight: 600, lineHeight: 1.45 }}>
+          Inspect the underlying operational database. SYSTEM//SHIFT runs on synthetic operational telemetry modeled on a university campus (30 days, 100,000+ records) — architected so the synthetic generator can be replaced directly with live IoT, GPS vehicle location, and turnstile feeds.
         </p>
       </div>
 
@@ -150,6 +151,13 @@ export default function DataPage() {
             <strong>3. Deterministic Simulation Backing:</strong>
             <p style={{ color: '#555', marginTop: '0.25rem' }}>
               The What-If engine uses queuing physics and fleet cost formulas grounded in these recorded distributions, ensuring mathematical consistency.
+            </p>
+          </div>
+
+          <div>
+            <strong>4. Live IoT & Feed Architecture:</strong>
+            <p style={{ color: '#555', marginTop: '0.25rem' }}>
+              Schemas follow industry-standard GTFS-RT (AVL transit), RFID attendance turnstiles, and MQTT smart meters. The synthetic generator is a modular drop-in that swaps directly for live feeds in production.
             </p>
           </div>
         </div>

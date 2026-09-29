@@ -13,13 +13,76 @@ BASELINE_OVERCROWDING_PCT = 78.0
 BASELINE_DAILY_COST = 18400.0  # ₹18,400 / day
 BASELINE_CANTEEN_SPIKE_DELAY = 18.0 # min delayed arrival
 
-# Route share distribution (Demand weight, Capacity share)
+# Route configurations matching database seeded state
 ROUTE_CONFIG = [
-    {"code": "Route 1", "name": "Campus Circular", "demand_share": 0.22, "cap_share": 0.25, "base_passengers": 100, "base_cap": 125, "stops": 8},
-    {"code": "Route 2", "name": "Hostel Hub", "demand_share": 0.25, "cap_share": 0.25, "base_passengers": 114, "base_cap": 125, "stops": 6},
-    {"code": "Route 3", "name": "Metro Rail Link (Critical)", "demand_share": 0.38, "cap_share": 0.25, "base_passengers": 173, "base_cap": 125, "stops": 10},
-    {"code": "Route 4", "name": "Research Park & Labs", "demand_share": 0.15, "cap_share": 0.25, "base_passengers": 68, "base_cap": 125, "stops": 5},
+    {
+        "code": "Route 1",
+        "name": "Campus Circular",
+        "base_buses": 3,
+        "base_passengers": 122,
+        "base_wait_min": 11.2,
+        "stops": 8,
+        "priority_rank": 3,
+    },
+    {
+        "code": "Route 2",
+        "name": "Hostel Express",
+        "base_buses": 2,
+        "base_passengers": 88,
+        "base_wait_min": 14.5,
+        "stops": 6,
+        "priority_rank": 2,
+    },
+    {
+        "code": "Route 3",
+        "name": "Metro Rail Link (Critical)",
+        "base_buses": 3,
+        "base_passengers": 146,
+        "base_wait_min": 24.8,
+        "stops": 10,
+        "priority_rank": 1,  # Primary bottleneck corridor
+    },
+    {
+        "code": "Route 4",
+        "name": "Research Park Shuttle",
+        "base_buses": 2,
+        "base_passengers": 68,
+        "base_wait_min": 7.4,
+        "stops": 5,
+        "priority_rank": 4,
+    },
 ]
+
+def allocate_fleet_to_routes(active_buses: int, demand_multiplier: float = 1.0) -> Dict[str, int]:
+    """
+    Explicit operational fleet dispatch model.
+    Allocates active buses across routes based on congestion pressure and corridor priority.
+    At 10 buses: exactly reproduces baseline [3, 2, 3, 2] fleet allocation.
+    When expanding (e.g. 10 -> 14 buses): deploys extra buses directly to highest-pressure routes (Route 3 first).
+    """
+    buses = {r["code"]: r["base_buses"] for r in ROUTE_CONFIG}
+    base_passengers = {r["code"]: r["base_passengers"] for r in ROUTE_CONFIG}
+    
+    if active_buses > 10:
+        for _ in range(active_buses - 10):
+            # Prioritize route with highest projected load
+            highest_route = max(
+                buses.keys(),
+                key=lambda code: (base_passengers[code] * demand_multiplier) / (buses[code] * 50)
+            )
+            buses[highest_route] += 1
+    elif active_buses < 10:
+        for _ in range(10 - active_buses):
+            # Trim from lowest load route with more than 1 bus
+            available_routes = [c for c in buses if buses[c] > 1]
+            if available_routes:
+                lowest_route = min(
+                    available_routes,
+                    key=lambda code: (base_passengers[code] * demand_multiplier) / (buses[code] * 50)
+                )
+                buses[lowest_route] -= 1
+                
+    return buses
 
 def run_deterministic_simulation(
     active_buses: int,
@@ -31,6 +94,8 @@ def run_deterministic_simulation(
     """
     Deterministic campus transport simulation model.
     Models queuing physics, fleet cost structures, and cross-system cascading effects.
+    Strictly calibrated to reproduce baseline ground truth (18.4 min wait, 78% overcrowding, ₹18,400 cost)
+    when evaluated with baseline inputs (10 buses, 10 min frequency, 0% demand mod, 90 min peak window).
     """
     # 1. Total capacity & effective demand
     bus_unit_capacity = 50
@@ -42,81 +107,95 @@ def run_deterministic_simulation(
     utilization_pct = min(150.0, round((effective_demand / max(1, total_capacity)) * 100.0, 1))
     
     # 3. Waiting time calculation: Headway arrival + non-linear congestion queue
-    # At baseline: 10 buses, 10 min frequency -> 18.4 min
-    # At 14 buses, 8 min frequency -> 9.7 min
+    # Baseline (10 buses, 10 min headway, 91.0% utilization) -> exactly 18.4 min wait
+    # Hero scenario (14 buses, 8 min headway, 65.0% utilization) -> exactly 7.4 min wait
     headway_wait = bus_frequency_min * 0.5
     
-    # Congestion delay derived from system capacity saturation
     if utilization_pct <= 60.0:
         congestion_delay = max(0.8, (utilization_pct / 60.0) * 2.2)
     elif utilization_pct <= 75.0:
         congestion_delay = 2.2 + ((utilization_pct - 60.0) / 15.0) * 3.5
-    elif utilization_pct <= 91.5:
-        # Steep queuing spike as capacity exhausts
-        congestion_delay = 5.7 + ((utilization_pct - 75.0) / 16.5) ** 1.35 * 7.7
+    elif utilization_pct <= 91.0:
+        # Calibrated queuing delay curve: exactly 13.4 min at 91.0% utilization
+        congestion_delay = 5.7 + (((utilization_pct - 75.0) / 16.0) ** 1.35) * 7.7
     else:
-        # Severe overflow
-        overflow = utilization_pct - 91.5
+        # Severe overflow above baseline 91.0%
+        overflow = utilization_pct - 91.0
         congestion_delay = 13.4 + (overflow * 0.9)
         
     peak_window_factor = (peak_window_min / 90.0) ** 0.4
     avg_wait_min = round(max(3.0, (headway_wait + congestion_delay) * peak_window_factor), 1)
-    peak_wait_min = round(avg_wait_min * 1.44, 1)
+    peak_wait_min = round(avg_wait_min * (BASELINE_PEAK_WAIT_MIN / BASELINE_WAIT_MIN), 1)
     
     # 4. Overcrowding index
-    # Baseline 10 buses: 78.0%. At 14 buses: 28.0%
+    # Baseline (91.0% utilization) -> exactly 78.0%
+    # Hero scenario (65.0% utilization) -> exactly 27.5%
     if utilization_pct <= 60.0:
         overcrowding_pct = round(max(5.0, (utilization_pct / 60.0) * 20.0), 1)
     elif utilization_pct <= 70.0:
         overcrowding_pct = round(20.0 + ((utilization_pct - 60.0) / 10.0) * 15.0, 1)
-    elif utilization_pct <= 91.5:
-        overcrowding_pct = round(35.0 + ((utilization_pct - 70.0) / 21.5) * 43.0, 1)
+    elif utilization_pct <= 91.0:
+        # Calibrated: 35.0 + (21.0 / 21.0) * 43.0 = 78.0% at 91.0% utilization
+        overcrowding_pct = round(35.0 + ((utilization_pct - 70.0) / 21.0) * 43.0, 1)
     else:
-        overcrowding_pct = round(min(99.0, 78.0 + (utilization_pct - 91.5) * 1.5), 1)
+        overcrowding_pct = round(min(99.0, 78.0 + (utilization_pct - 91.0) * 1.5), 1)
 
     # 5. Operating Cost Calculation (INR)
-    # Baseline (10 buses, 10 min): ₹18,400 / day
-    # At 14 buses (8 min): ₹24,800 / day
-    fixed_depot_overhead = 4400.0
-    active_bus_rate = active_buses * 1250.0  # Drivers & maintenance
-    frequency_mileage = (60.0 / max(3.0, bus_frequency_min)) * active_buses * 28.0 # Fuel & wear
+    # Calibrated cost model:
+    # Baseline (10 buses, 10 min frequency): 3980 + 10*1250 + 6*10*32 = ₹18,400 / day
+    # Hero (14 buses, 8 min frequency): 3980 + 14*1250 + 7.5*14*32 = ₹24,840 / day (+₹6,440/day)
+    fixed_depot_overhead = 3980.0
+    active_bus_rate = active_buses * 1250.0  # Drivers, maintenance & depot support
+    frequency_mileage = (60.0 / max(3.0, bus_frequency_min)) * active_buses * 32.0 # Fuel, wear & operational hours
     daily_operating_cost = round(fixed_depot_overhead + active_bus_rate + frequency_mileage, 0)
 
     # 6. Unmet demand & throughput
     throughput_per_hr = int(min(effective_demand, total_capacity) * (60.0 / bus_frequency_min) / 10.0)
     unmet_demand = max(0, int(effective_demand - total_capacity))
 
-    # 7. Route-by-route impacts
+    # 7. Route-by-route impacts with dynamic operational allocation
+    route_buses = allocate_fleet_to_routes(active_buses, demand_multiplier)
     route_impacts: List[RouteSimImpact] = []
+    
     for r in ROUTE_CONFIG:
-        # Route 3 (Metro Link) absorbs higher proportion of peak demand
-        route_demand = effective_demand * r["demand_share"]
-        # Distribute buses proportionally, minimum 1
-        route_cap = max(50, total_capacity * r["cap_share"])
-        r_util = round((route_demand / route_cap) * 100.0, 1)
-        r_wait = round(max(2.5, avg_wait_min * (route_demand / (effective_demand * 0.25))), 1)
-        status = "HEALTHY" if r_util < 80 else ("WARNING" if r_util < 92 else "CRITICAL")
+        code = r["code"]
+        base_buses = r["base_buses"]
+        base_cap = base_buses * 50
+        base_passengers = r["base_passengers"]
+        base_util = round((base_passengers / base_cap) * 100.0, 1)
+        base_wait = r["base_wait_min"]
         
-        # Baseline comparison
-        base_route_demand = BASELINE_DEMAND * r["demand_share"]
-        base_route_cap = BASELINE_CAPACITY * r["cap_share"]
-        base_r_util = round((base_route_demand / base_route_cap) * 100.0, 1)
-        base_r_wait = round(BASELINE_WAIT_MIN * (base_route_demand / (BASELINE_DEMAND * 0.25)), 1)
+        sim_buses = route_buses[code]
+        sim_cap = sim_buses * 50
+        sim_demand = base_passengers * demand_multiplier
+        sim_util = round((sim_demand / sim_cap) * 100.0, 1)
+        
+        # Route wait scales with headway adjustment and congestion curve relative to base
+        headway_ratio = bus_frequency_min / BASELINE_FREQUENCY
+        if sim_util <= 75.0:
+            congestion_ratio = max(0.35, sim_util / base_util)
+        else:
+            congestion_ratio = (sim_util / base_util) ** 1.3
+        
+        sim_wait = round(max(2.5, base_wait * headway_ratio * congestion_ratio), 1)
+        status = "HEALTHY" if sim_util < 75.0 else ("WARNING" if sim_util < 90.0 else "CRITICAL")
         
         route_impacts.append(RouteSimImpact(
-            route_code=r["code"],
-            current_utilization=base_r_util,
-            simulated_utilization=r_util,
-            current_wait=base_r_wait,
-            simulated_wait=r_wait,
+            route_code=code,
+            current_utilization=base_util,
+            simulated_utilization=sim_util,
+            current_wait=base_wait,
+            simulated_wait=sim_wait,
             status=status
         ))
 
     # 8. Cascading cross-system impacts
-    # Transport delay cascades directly into delayed arrival at Canteen and altered Library buffer
     transit_delay_delta = avg_wait_min - BASELINE_WAIT_MIN
     canteen_delay_min = max(2.0, round(BASELINE_CANTEEN_SPIKE_DELAY + transit_delay_delta * 0.8, 1))
-    canteen_peak_congestion_shift = f"{'+' if transit_delay_delta >= 0 else ''}{round(transit_delay_delta * 0.8, 1)} min arrival postponement"
+    canteen_peak_congestion_shift = (
+        f"{'+' if transit_delay_delta > 0 else ''}{round(transit_delay_delta * 0.8, 1)} min arrival postponement"
+        if abs(transit_delay_delta) >= 0.1 else "0.0 min arrival postponement (nominal)"
+    )
     canteen_congestion_load = min(98.0, max(45.0, round(74.0 + (transit_delay_delta * 1.4), 1)))
     library_occupancy_sim = min(99.0, max(60.0, round(96.0 - (transit_delay_delta * 0.5), 1)))
 
@@ -127,8 +206,11 @@ def run_deterministic_simulation(
         "canteen_queue_estimate_min": canteen_delay_min,
         "cascade_summary": (
             f"Faster transit (avg wait {avg_wait_min}m) allows student cohorts to reach dining halls on regular schedule, avoiding compressed 13:00 canteen rushes."
-            if transit_delay_delta < 0 else
-            f"Elevated transit delay (+{round(transit_delay_delta, 1)}m) clusters arriving students, creating a severe secondary dining queue bottleneck between 12:45-13:30."
+            if transit_delay_delta < -0.1 else (
+                f"Elevated transit delay (+{round(transit_delay_delta, 1)}m) clusters arriving students, creating a severe secondary dining queue bottleneck between 12:45-13:30."
+                if transit_delay_delta > 0.1 else
+                "Current transit queuing (18.4 min wait) propagates into downstream dining, shifting lunch arrival cohorts and sustaining 74% Canteen load."
+            )
         )
     }
 
@@ -138,12 +220,21 @@ def run_deterministic_simulation(
     diff_overcrowd = round(overcrowding_pct - BASELINE_OVERCROWDING_PCT, 1)
     diff_util = round(utilization_pct - BASELINE_UTILIZATION, 1)
 
-    pct_diff_wait = round((diff_wait / BASELINE_WAIT_MIN) * 100.0, 1)
-    pct_diff_cost = round((diff_cost / BASELINE_DAILY_COST) * 100.0, 1)
-    pct_diff_overcrowd = round((diff_overcrowd / BASELINE_OVERCROWDING_PCT) * 100.0, 1)
-    pct_diff_util = round((diff_util / BASELINE_UTILIZATION) * 100.0, 1)
+    pct_diff_wait = round((diff_wait / BASELINE_WAIT_MIN) * 100.0, 1) if BASELINE_WAIT_MIN else 0.0
+    pct_diff_cost = round((diff_cost / BASELINE_DAILY_COST) * 100.0, 1) if BASELINE_DAILY_COST else 0.0
+    pct_diff_overcrowd = round((diff_overcrowd / BASELINE_OVERCROWDING_PCT) * 100.0, 1) if BASELINE_OVERCROWDING_PCT else 0.0
+    pct_diff_util = round((diff_util / BASELINE_UTILIZATION) * 100.0, 1) if BASELINE_UTILIZATION else 0.0
 
-    if diff_wait <= -1.0 and diff_cost > 600:
+    if abs(diff_wait) < 0.1 and abs(diff_cost) < 50 and abs(diff_overcrowd) < 0.1:
+        trade_off_type = "BASELINE_OPERATIONAL_STATE"
+        trade_off_title = "BASELINE GROUND TRUTH (08:30 PEAK)"
+        trade_off_description = (
+            "Active operational state: 10 buses at 10 min headway. System exhibits acute Route 3 bottleneck (97.3% load) and 18.4 min average wait time across 455 peak commuters."
+        )
+        human_decision_prompt = (
+            "Baseline parameters currently active. The human operator can adjust fleet size, headway, or demand parameters to simulate trade-offs before executing changes."
+        )
+    elif diff_wait <= -1.0 and diff_cost > 600:
         trade_off_type = "TRADE_OFF_DETECTED"
         trade_off_title = "TRADE-OFF DETECTED"
         trade_off_description = (
@@ -212,7 +303,7 @@ def run_deterministic_simulation(
             diff_abs=diff_util,
             diff_pct=pct_diff_util,
             direction="DOWN" if diff_util < 0 else ("UP" if diff_util > 0 else "NEUTRAL"),
-            impact="POSITIVE" if 70 <= utilization_pct <= 85 else "NEGATIVE"
+            impact="NEUTRAL" if diff_util == 0 else ("POSITIVE" if 60 <= utilization_pct <= 80 else "NEGATIVE")
         ),
         MetricComparison(
             metric="Daily Operating Cost",
@@ -231,8 +322,8 @@ def run_deterministic_simulation(
             unit="min",
             diff_abs=round(peak_wait_min - BASELINE_PEAK_WAIT_MIN, 1),
             diff_pct=round(((peak_wait_min - BASELINE_PEAK_WAIT_MIN) / BASELINE_PEAK_WAIT_MIN) * 100.0, 1),
-            direction="DOWN" if peak_wait_min < BASELINE_PEAK_WAIT_MIN else "UP",
-            impact="POSITIVE" if peak_wait_min < BASELINE_PEAK_WAIT_MIN else "NEGATIVE"
+            direction="DOWN" if peak_wait_min < BASELINE_PEAK_WAIT_MIN else ("UP" if peak_wait_min > BASELINE_PEAK_WAIT_MIN else "NEUTRAL"),
+            impact="POSITIVE" if peak_wait_min < BASELINE_PEAK_WAIT_MIN else ("NEGATIVE" if peak_wait_min > BASELINE_PEAK_WAIT_MIN else "NEUTRAL")
         )
     ]
 
@@ -274,3 +365,4 @@ def run_deterministic_simulation(
         route_impacts=route_impacts,
         cascading_impact=cascading_impact
     )
+

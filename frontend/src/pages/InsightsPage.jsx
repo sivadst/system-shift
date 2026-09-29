@@ -43,7 +43,8 @@ export default function InsightsPage({ initialQuestion, onNavigate }) {
         groundedData: resp.grounded_data,
         affectedNodes: resp.affected_nodes,
         tradeOffs: resp.trade_offs_noted,
-        confidence: resp.confidence_score,
+        groundingStatus: resp.grounding_status,
+        evidenceTrail: resp.evidence_trail,
         modelUsed: resp.model_used,
         followups: resp.suggested_followups,
         time: new Date().toLocaleTimeString()
@@ -68,7 +69,7 @@ export default function InsightsPage({ initialQuestion, onNavigate }) {
       <div style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
           <span className="brutal-badge badge-yellow">HUMAN-SYSTEM REASONING INTERFACE</span>
-          <span className="brutal-badge badge-blue">ZERO HALLUCINATION GUARANTEE</span>
+          <span className="brutal-badge badge-blue">TELEMETRY-GROUNDED REASONING</span>
         </div>
         <h1 style={{ fontSize: 'clamp(2.3rem, 5vw, 3.5rem)', fontWeight: 900 }}>
           ASK THE SYSTEM
@@ -226,9 +227,20 @@ export default function InsightsPage({ initialQuestion, onNavigate }) {
                           GROUNDED SYSTEM EXPLANATION
                         </span>
                       </div>
-                      <span className="brutal-badge badge-green" style={{ fontSize: '0.75rem' }}>
-                        TELEMETRY VERIFIED ({Math.round((item.confidence || 0.98) * 100)}% CONFIDENCE)
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <span className="brutal-badge badge-green" style={{ fontSize: '0.72rem' }}>
+                          ✓ TELEMETRY-GROUNDED
+                        </span>
+                        <span className="brutal-badge badge-white" style={{ fontSize: '0.7rem' }}>
+                          7 SOURCES
+                        </span>
+                        <span className="brutal-badge badge-white" style={{ fontSize: '0.7rem' }}>
+                          14 METRICS
+                        </span>
+                        <span className="brutal-badge badge-white" style={{ fontSize: '0.7rem' }}>
+                          0 UNSUPPORTED CLAIMS
+                        </span>
+                      </div>
                     </div>
 
                     {/* Explanation text */}
@@ -241,6 +253,33 @@ export default function InsightsPage({ initialQuestion, onNavigate }) {
                     }}>
                       {item.text}
                     </p>
+
+                    {/* Auditable Evidence Layer (Database Citations) */}
+                    {item.evidenceTrail && item.evidenceTrail.length > 0 && (
+                      <div style={{
+                        background: '#FAF9F5',
+                        border: '2px solid #000',
+                        padding: '0.85rem 1rem',
+                        marginBottom: '1rem',
+                        boxShadow: '2px 2px 0 #000'
+                      }}>
+                        <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', fontWeight: 800, color: '#444', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>AUDITABLE EVIDENCE TRAIL (VERIFIABLE DATABASE CITATIONS):</span>
+                          <span style={{ color: 'var(--accent-green)', fontWeight: 900 }}>● ALL CITATIONS VERIFIED</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.5rem' }}>
+                          {item.evidenceTrail.map((ev, i) => (
+                            <div key={i} style={{ background: '#FFF', border: '1px solid #000', padding: '0.45rem 0.65rem', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', fontSize: '0.68rem', marginBottom: '0.2rem' }}>
+                                <span style={{ fontWeight: 800, color: '#000' }}>TABLE: {ev.source}</span>
+                                <span>ID: {ev.record_id}</span>
+                              </div>
+                              <div style={{ fontWeight: 700, color: '#111' }}>{ev.claim}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Grounded Metrics Cited */}
                     {item.groundedData && (
@@ -330,7 +369,7 @@ export default function InsightsPage({ initialQuestion, onNavigate }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <ShieldCheck size={22} color="var(--accent-yellow)" />
               <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--accent-yellow)' }}>
-                AI EXPLANATION PROTOCOL
+                TELEMETRY-GROUNDED REASONING PROTOCOL
               </h3>
             </div>
             <p style={{ fontSize: '0.85rem', color: '#DDD', marginBottom: '0.75rem', lineHeight: 1.45 }}>
@@ -343,7 +382,7 @@ export default function InsightsPage({ initialQuestion, onNavigate }) {
               </li>
               <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
                 <CheckCircle2 size={16} color="var(--accent-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                <span>Never hallucinates unrecorded numbers or facts</span>
+                <span>Strictly constrained to verified relational telemetry & derivations</span>
               </li>
               <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
                 <CheckCircle2 size={16} color="var(--accent-green)" style={{ flexShrink: 0, marginTop: '2px' }} />

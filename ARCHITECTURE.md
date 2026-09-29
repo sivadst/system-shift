@@ -86,7 +86,7 @@ The system map visualizes these dependency paths dynamically with animated signa
 
 ## 3. Data Ingestion & Storage Architecture
 
-### High-Performance Synthetic Telemetry
+### High-Performance Synthetic Telemetry & Live IoT Adapter Layer
 To prove technical credibility without enterprise infrastructure overhead, SYSTEM//SHIFT generates **100,000+ operational records** upon first boot using transactional batch insertion:
 * **Time Span**: 30 days of simulated operation.
 * **Diurnal Modeling**: Temporal distribution follows empirical campus mobility curves:
@@ -95,24 +95,28 @@ To prove technical credibility without enterprise infrastructure overhead, SYSTE
   * Study Peak (14:30–18:00): 40% library weight.
   * Evening Peak (18:00–20:30): 40% outbound transit weight.
 * **Anomalies Injected**: The database contains realistic incidents such as vehicle turnstile sensor lag, peak corridor surges, and the primary **08:30 Route 3 morning bottleneck**.
+* **Live Feed Compatibility**: Ingestion schemas strictly follow industry standards: GTFS-RT (automatic vehicle location), RFID badge turnstiles, and MQTT/BACnet smart facility meters. The synthetic data generator is a modular drop-in that can be replaced directly with live IoT sensor feeds in production.
 
 ---
 
-## 4. AI Grounding Architecture: Zero-Hallucination Protocol
+## 4. AI Grounding Architecture: Telemetry-Grounded Reasoning Protocol
 
 A core failure mode of modern AI applications is inventing metrics. SYSTEM//SHIFT implements a strict **4-phase grounding pipeline**:
 
 1. **Context Harvesting**: When the user asks a question, the backend queries the database for actual values:
    * Current fleet utilization (`91.0%`)
    * Active wait times (`18.4 min` avg, `26.5 min` peak)
-   * Route-level breakdown (`Route 3: 97.3% utilization`)
+   * Route-level breakdown (`Route 3: 97.3% utilization`, `Route 1: 81.3%`, `Route 2: 88.0%`)
    * Downstream pressure states (`Canteen: 74%`, `Library: 96%`)
 2. **System Instruction Guardrails**:
-   > *"You are explaining a complex operational system to a human decision-maker. Use ONLY the supplied structured backend data. Do not invent metrics. Distinguish observed data from simulated estimates. Explain causes and relationships clearly. NEVER make decisions on behalf of the user."*
-3. **Dual Execution Engine**:
+   > *"You are explaining a complex operational system to a human decision-maker. Use ONLY the supplied structured backend telemetry. Base all claims strictly on the provided data. Distinguish observed data from simulated estimates. Explain causes and relationships clearly. NEVER make decisions on behalf of the user."*
+3. **Auditable Evidence Layer & Grounding Status**:
+   * Generates a verifiable **Grounding Status** (7 telemetry sources retrieved, 14 metrics referenced, 0 unsupported claims).
+   * Generates an **Evidence Trail** mapping every cited statistic to its source table, record ID, and field.
+4. **Dual Execution Engine**:
    * **Online**: Connects to the **Google Gemini API** (`gemini-2.5-flash`) with temperature `0.2` for structured reasoning.
    * **Offline Fallback**: If no API key is supplied or network is unavailable, an algorithmic **Deterministic Grounded Reasoner** parses telemetry context and produces exact data-cited explanations. The demo is 100% immune to API rate limits or network failures.
-4. **Audit Logging**: Every AI query, context snapshot, cited metrics, and model response are persisted in the `ai_queries` database table.
+5. **Audit Logging**: Every AI query, context snapshot, cited metrics, and model response are persisted in the `ai_queries` database table.
 
 ---
 
